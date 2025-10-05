@@ -7,7 +7,9 @@ import whisper
 import librosa
 import numpy as np
 from pydub import AudioSegment
+from pydub.utils import which
 from sentence_transformers import SentenceTransformer
+import shutil
 
 from ..models import (
     DocumentMetadata, AudioSegment as AudioSegmentModel, 
@@ -19,6 +21,9 @@ logger = logging.getLogger(__name__)
 
 class AudioProcessor:
     def __init__(self):
+        # Configure FFmpeg paths for pydub
+        self._configure_ffmpeg()
+        
         # Load Whisper model for speech-to-text
         self.whisper_model = whisper.load_model(settings.whisper_model)
         
@@ -32,6 +37,34 @@ class AudioProcessor:
         self.segment_length = 30  # seconds
         self.overlap_length = 5   # seconds
     
+    def _configure_ffmpeg(self):
+        """Configure FFmpeg and ffprobe paths for pydub and whisper."""
+        import pydub
+        
+        # Try to find ffmpeg
+        ffmpeg_path = settings.ffmpeg_path or shutil.which('ffmpeg')
+        
+        if not ffmpeg_path and os.name == 'nt':  # Windows
+            # Check WinGet installation path
+            winget_paths = list(Path(os.path.expanduser('~')).glob(
+                'AppData/Local/Microsoft/WinGet/Packages/Gyan.FFmpeg*/ffmpeg*/bin'
+            ))
+            if winget_paths:
+                bin_dir = str(winget_paths[0])
+                ffmpeg_path = os.path.join(bin_dir, 'ffmpeg.exe')
+                ffprobe_path = os.path.join(bin_dir, 'ffprobe.exe')
+                
+                # Set environment variables for pydub and whisper
+                os.environ['PATH'] = bin_dir + os.pathsep + os.environ.get('PATH', '')
+                
+                # Configure pydub
+                AudioSegment.converter = ffmpeg_path
+                AudioSegment.ffmpeg = ffmpeg_path
+                AudioSegment.ffprobe = ffprobe_path
+                
+                logger.info(f"Configured FFmpeg at: {ffmpeg_path}")
+                logger.info(f"Configured FFprobe at: {ffprobe_path}")
+        
     async def process_audio(self, file_path: str, filename: str) -> tuple[DocumentMetadata, List[AudioSegmentModel]]:
         """Process an audio file and extract transcription with timestamps."""
         try:

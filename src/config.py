@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     llama_model: str = "meta-llama/Llama-2-7b-chat-hf"
     max_context_length: int = 4096
     max_retrieved_docs: int = 5
+    use_local_model: bool = False  # Disable local model to save GPU memory (use Cerebras API)
     
     # Citation Configuration
     citation_format: str = "numbered"

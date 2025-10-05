@@ -25,7 +25,9 @@ class LlamaRAGSystem:
         # Fallback to local Llama model if Cerebras is unavailable
         self.local_model = None
         self.local_tokenizer = None
-        self._initialize_local_model()
+        # Only initialize local model if explicitly enabled (disabled by default to save GPU memory)
+        if settings.use_local_model:
+            self._initialize_local_model()
         
         # Conversation memory
         self.conversation_history = {}
