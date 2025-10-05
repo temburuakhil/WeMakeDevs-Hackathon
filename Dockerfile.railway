@@ -1,64 +1,25 @@
-# Railway Production Dockerfile - Ultra-lightweight for fast builds
+# BACKUP: Railway Dockerfile - Install deps at runtime
 FROM python:3.11-slim
 
-# Set working directory
 WORKDIR /app
 
-# Install only critical system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    ffmpeg \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+# Only install curl and ffmpeg (system deps)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl ffmpeg && \
+    rm -rf /var/lib/apt/lists/*
 
-# Copy requirements
-COPY requirements.txt .
+# Copy everything
+COPY . .
 
-# Create a minimal requirements file for Railway (exclude heavy packages)
-RUN echo "fastapi==0.104.1" > requirements-minimal.txt && \
-    echo "uvicorn[standard]==0.24.0" >> requirements-minimal.txt && \
-    echo "cerebras-cloud-sdk==1.0.0" >> requirements-minimal.txt && \
-    echo "chromadb==0.4.15" >> requirements-minimal.txt && \
-    echo "sentence-transformers==2.3.1" >> requirements-minimal.txt && \
-    echo "python-dotenv==1.0.0" >> requirements-minimal.txt && \
-    echo "pydantic==2.5.0" >> requirements-minimal.txt && \
-    echo "pydantic-settings==2.1.0" >> requirements-minimal.txt && \
-    echo "pydub==0.25.1" >> requirements-minimal.txt && \
-    echo "PyPDF2==3.0.1" >> requirements-minimal.txt && \
-    echo "python-docx==1.1.0" >> requirements-minimal.txt && \
-    echo "python-magic==0.4.27" >> requirements-minimal.txt && \
-    echo "Pillow==10.1.0" >> requirements-minimal.txt
+# Create dirs
+RUN mkdir -p /app/data/chroma_db /app/data/models /app/uploads
 
-# Install minimal requirements first
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements-minimal.txt
-
-# Install Whisper separately (it's large)
-RUN pip install --no-cache-dir openai-whisper
-
-# Copy only essential application files
-COPY src ./src
-COPY main.py .
-
-# Create directories
-RUN mkdir -p /app/data/chroma_db /app/data/temp /app/data/models /app/uploads
-
-# Environment variables
+# Environment
 ENV PYTHONPATH=/app \
     PYTHONUNBUFFERED=1 \
     PORT=8000 \
-    HF_HOME=/app/data/models \
-    TRANSFORMERS_CACHE=/app/data/models \
     WHISPER_MODEL=tiny
 
-# Expose port
-EXPOSE ${PORT}
-
-# Healthcheck
-HEALTHCHECK --interval=60s --timeout=30s --start-period=180s --retries=3 \
-    CMD curl -f http://localhost:${PORT}/health || exit 1
-
-# Start command
-CMD python -m uvicorn src.api.main:app --host 0.0.0.0 --port ${PORT} --workers 1
-
+# Install dependencies at RUNTIME (not build time)
+CMD pip install --no-cache-dir -q fastapi uvicorn cerebras-cloud-sdk chromadb sentence-transformers openai-whisper pydub python-dotenv PyPDF2 python-docx pydantic pydantic-settings Pillow && \
+    python -m uvicorn src.api.main:app --host 0.0.0.0 --port ${PORT}
