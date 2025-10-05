@@ -38,9 +38,17 @@ env/
 *.swo
 *~
 
-# Data & Uploads
-data/
-uploads/
+# Data & Uploads (keep structure, ignore content)
+data/*
+!data/.gitkeep
+data/chroma_db/*
+!data/chroma_db/.gitkeep
+data/temp/*
+!data/temp/.gitkeep
+data/thumbnails/*
+!data/thumbnails/.gitkeep
+uploads/*
+!uploads/.gitkeep
 *.db
 *.sqlite
 chroma_db/

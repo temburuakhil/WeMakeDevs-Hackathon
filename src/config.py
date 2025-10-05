@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     
     # Audio Processing
     whisper_model: str = "base"
+    ffmpeg_path: Optional[str] = None  # Path to ffmpeg executable, auto-detected if not set
     
     # Image Processing
     clip_model: str = "ViT-B/32"
