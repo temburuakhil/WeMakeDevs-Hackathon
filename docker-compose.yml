@@ -1,0 +1,200 @@
+services:
+  # Main RAG Application
+  multimodal-rag:
+    build: .
+    container_name: multimodal_rag_app
+    ports:
+      - "8000:8000"
+    environment:
+      - CEREBRAS_API_KEY=${CEREBRAS_API_KEY}
+      - PYTHONPATH=/app
+    volumes:
+      - ./data:/app/data
+      - ./uploads:/app/uploads
+      - rag_models:/app/models
+    depends_on:
+      - redis
+      - mcp-gateway
+    networks:
+      - rag_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis for caching and session storage
+  redis:
+    image: redis:7-alpine
+    container_name: multimodal_rag_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - rag_network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  # ChromaDB Vector Database (if using separate instance)
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: multimodal_rag_chromadb
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - CHROMA_SERVER_HOST=0.0.0.0
+      - CHROMA_SERVER_HTTP_PORT=8000
+    networks:
+      - rag_network
+    restart: unless-stopped
+
+  # Docker MCP Gateway for creative orchestration
+  mcp-gateway:
+    image: alpine:latest
+    container_name: multimodal_rag_mcp_gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - MCP_MODE=orchestrator
+      - SERVICES=multimodal-rag,redis,chromadb
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./mcp-config:/etc/mcp
+    networks:
+      - rag_network
+    restart: unless-stopped
+    command: |
+      sh -c "
+        apk add --no-cache curl jq docker-cli &&
+        echo 'MCP Gateway: Monitoring RAG services...' &&
+        while true; do
+          echo 'Health check: multimodal-rag' &&
+          curl -s http://multimodal-rag:8000/health | jq . || echo 'RAG service unavailable' &&
+          echo 'Health check: redis' &&
+          docker exec multimodal_rag_redis redis-cli ping || echo 'Redis unavailable' &&
+          echo 'Health check: chromadb' &&
+          curl -s http://chromadb:8000/api/v1/heartbeat || echo 'ChromaDB unavailable' &&
+          sleep 30
+        done
+      "
+
+  # Document processor microservice (example of microservice decomposition)
+  document-processor:
+    build: 
+      context: .
+      dockerfile: Dockerfile.processor
+    container_name: multimodal_rag_doc_processor
+    environment:
+      - PYTHONPATH=/app
+      - PROCESSOR_TYPE=document
+    volumes:
+      - ./uploads:/app/uploads
+      - ./data:/app/data
+    networks:
+      - rag_network
+    restart: unless-stopped
+    command: ["python", "-m", "src.services.document_service"]
+
+  # Image processor microservice
+  image-processor:
+    build: 
+      context: .
+      dockerfile: Dockerfile.processor
+    container_name: multimodal_rag_img_processor
+    environment:
+      - PYTHONPATH=/app
+      - PROCESSOR_TYPE=image
+    volumes:
+      - ./uploads:/app/uploads
+      - ./data:/app/data
+    networks:
+      - rag_network
+    restart: unless-stopped
+    command: ["python", "-m", "src.services.image_service"]
+
+  # Audio processor microservice
+  audio-processor:
+    build: 
+      context: .
+      dockerfile: Dockerfile.processor
+    container_name: multimodal_rag_audio_processor
+    environment:
+      - PYTHONPATH=/app
+      - PROCESSOR_TYPE=audio
+    volumes:
+      - ./uploads:/app/uploads
+      - ./data:/app/data
+    networks:
+      - rag_network
+    restart: unless-stopped
+    command: ["python", "-m", "src.services.audio_service"]
+
+  # Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: multimodal_rag_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - multimodal-rag
+    networks:
+      - rag_network
+    restart: unless-stopped
+
+  # Monitoring with Prometheus (optional)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: multimodal_rag_prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - rag_network
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+  # Grafana for visualization (optional)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: multimodal_rag_grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - rag_network
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+networks:
+  rag_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  redis_data:
+    driver: local
+  chroma_data:
+    driver: local
+  rag_models:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
