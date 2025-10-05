@@ -1,67 +1,64 @@
-# Railway Production Dockerfile - Optimized for faster builds
+# Railway Production Dockerfile - Ultra-lightweight for fast builds
 FROM python:3.11-slim
 
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies including FFmpeg
+# Install only critical system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
     curl \
     ffmpeg \
-    git \
-    libmagic1 \
-    libsndfile1 \
-    tesseract-ocr \
-    libtesseract-dev \
-    libgl1-mesa-glx \
-    libglib2.0-0 \
-    libsm6 \
-    libxext6 \
-    libxrender-dev \
-    libgomp1 \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
-# Copy requirements first for better caching
+# Copy requirements
 COPY requirements.txt .
 
-# Install Python dependencies in a single layer with timeout settings
-# Split into critical and non-critical packages for better build reliability
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir --timeout=300 \
-    fastapi==0.104.1 \
-    uvicorn[standard]==0.24.0 \
-    cerebras-cloud-sdk==1.0.0 \
-    chromadb==0.4.15 \
-    sentence-transformers==2.3.1 \
-    openai-whisper \
-    pydub \
-    python-dotenv \
-    && pip install --no-cache-dir --timeout=300 -r requirements.txt || \
-    pip install --no-cache-dir --timeout=600 -r requirements.txt
+# Create a minimal requirements file for Railway (exclude heavy packages)
+RUN echo "fastapi==0.104.1" > requirements-minimal.txt && \
+    echo "uvicorn[standard]==0.24.0" >> requirements-minimal.txt && \
+    echo "cerebras-cloud-sdk==1.0.0" >> requirements-minimal.txt && \
+    echo "chromadb==0.4.15" >> requirements-minimal.txt && \
+    echo "sentence-transformers==2.3.1" >> requirements-minimal.txt && \
+    echo "python-dotenv==1.0.0" >> requirements-minimal.txt && \
+    echo "pydantic==2.5.0" >> requirements-minimal.txt && \
+    echo "pydantic-settings==2.1.0" >> requirements-minimal.txt && \
+    echo "pydub==0.25.1" >> requirements-minimal.txt && \
+    echo "PyPDF2==3.0.1" >> requirements-minimal.txt && \
+    echo "python-docx==1.1.0" >> requirements-minimal.txt && \
+    echo "python-magic==0.4.27" >> requirements-minimal.txt && \
+    echo "Pillow==10.1.0" >> requirements-minimal.txt
 
-# Copy application code
+# Install minimal requirements first
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements-minimal.txt
+
+# Install Whisper separately (it's large)
+RUN pip install --no-cache-dir openai-whisper
+
+# Copy only essential application files
 COPY src ./src
-COPY frontend ./frontend
 COPY main.py .
 
-# Create necessary directories
-RUN mkdir -p /app/data /app/uploads /app/data/chroma_db /app/data/thumbnails /app/data/temp
+# Create directories
+RUN mkdir -p /app/data/chroma_db /app/data/temp /app/data/models /app/uploads
 
-# Set environment variables
-ENV PYTHONPATH=/app
-ENV PYTHONUNBUFFERED=1
-ENV PORT=8000
-ENV HF_HOME=/app/data/models
-ENV TRANSFORMERS_CACHE=/app/data/models
+# Environment variables
+ENV PYTHONPATH=/app \
+    PYTHONUNBUFFERED=1 \
+    PORT=8000 \
+    HF_HOME=/app/data/models \
+    TRANSFORMERS_CACHE=/app/data/models \
+    WHISPER_MODEL=tiny
 
-# Expose port (Railway will override this with $PORT)
+# Expose port
 EXPOSE ${PORT}
 
-# Health check with longer timeout for model loading
-HEALTHCHECK --interval=60s --timeout=30s --start-period=120s --retries=3 \
+# Healthcheck
+HEALTHCHECK --interval=60s --timeout=30s --start-period=180s --retries=3 \
     CMD curl -f http://localhost:${PORT}/health || exit 1
 
-# Command to run the application
+# Start command
 CMD python -m uvicorn src.api.main:app --host 0.0.0.0 --port ${PORT} --workers 1
+
