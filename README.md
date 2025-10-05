@@ -199,10 +199,7 @@ cp .env.example .env
 
 **Windows (PowerShell - Recommended):**
 ```powershell
-# Option 1: Use our automated setup script
-.\setup-ffmpeg.ps1
-
-# Option 2: Manual installation
+# Manual installation using WinGet
 winget install ffmpeg
 ```
 
@@ -215,8 +212,6 @@ brew install ffmpeg
 ```bash
 sudo apt-get update && sudo apt-get install -y ffmpeg tesseract-ocr
 ```
-
-**Note for Windows users:** If you encounter "ffmpeg not found" errors after installation, run `.\setup-ffmpeg.ps1` to automatically add FFmpeg to your system PATH.
 
 ### 4. Start Services
 
@@ -246,26 +241,6 @@ docker-compose up --build
 # Access the application
 open http://localhost
 ```
-
-## 🚂 Railway Deployment (Production)
-
-Deploy to Railway in one click!
-
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=https://github.com/temburuakhil/WeMakeDevs-Hackathon)
-
-**Quick Steps:**
-1. Click the button above or go to [railway.app/new](https://railway.app/new)
-2. Connect your GitHub repository
-3. Add your `CEREBRAS_API_KEY` in environment variables
-4. Deploy! Your app will be live in ~5 minutes
-
-**Detailed deployment guide**: See [RAILWAY_DEPLOYMENT.md](RAILWAY_DEPLOYMENT.md)
-
-**What's included in Railway deployment:**
-- ✅ FastAPI + ChromaDB (embedded)
-- ✅ FFmpeg, Whisper, CLIP pre-installed
-- ✅ Auto-scaling and SSL
-- ✅ $5 free credits/month
 
 ## 🎨 User Interface
 
