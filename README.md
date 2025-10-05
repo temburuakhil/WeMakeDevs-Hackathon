@@ -2,7 +2,7 @@
 
 An intelligent search and retrieval system that seamlessly handles documents (PDF/DOCX), images, audio recordings, and videos using Retrieval-Augmented Generation (RAG) with multimodal capabilities powered by Meta Llama via Cerebras API.
 
-## 🏆 Hackathon Highlights
+## 🏆 Project Highlights
 
 ### 🚀 Best Use of Cerebras API
 Our system leverages **Cerebras Cloud SDK** for ultra-fast LLM inference:
@@ -708,8 +708,7 @@ python -m uvicorn src.api.main:app --log-level debug
 ```
 
 ### Support
-- 📧 Email: [your-email]
-- 💬 Discord: [your-discord]
+- 📧 Email: [your-email](temburuakhil@gmail.com)
 - 📝 Issues: [GitHub Issues](https://github.com/your-repo/issues)
 
 ---
