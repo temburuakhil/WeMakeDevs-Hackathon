@@ -708,7 +708,7 @@ python -m uvicorn src.api.main:app --log-level debug
 ```
 
 ### Support
-- 📧 Email: [your-email](temburuakhil@gmail.com)
+- 📧 Email: temburuakhil@gmail.com
 - 📝 Issues: [GitHub Issues](https://github.com/your-repo/issues)
 
 ---
